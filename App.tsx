@@ -1,10 +1,14 @@
+// App.tsx - النسخة المحدثة مع نظام المصادقة
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, Alert } from 'react-native';
+import { Alert } from 'react-native';
 import { Provider as PaperProvider } from 'react-native-paper';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { testConnection } from './src/services/supabase';
 import { colors } from './src/styles/colors';
+import AppNavigator from './src/navigation/AppNavigator';
 
+// تخصيص Theme لـ React Native Paper
 const theme = {
   colors: {
     primary: colors.primary,
@@ -17,11 +21,17 @@ const theme = {
     disabled: colors.gray[400],
     placeholder: colors.gray[500],
     backdrop: 'rgba(0, 0, 0, 0.5)',
+    // ألوان إضافية لـ React Native Paper
+    notification: colors.primary,
   },
+  // إعدادات إضافية للـ theme
+  roundness: 8,
+  version: 3 as const,
 };
 
 export default function App() {
   useEffect(() => {
+    // اختبار اتصال قاعدة البيانات عند بدء التطبيق
     const checkConnection = async () => {
       const isConnected = await testConnection();
       if (!isConnected) {
@@ -37,42 +47,11 @@ export default function App() {
   }, []);
 
   return (
-    <PaperProvider theme={theme}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Board Iraq</Text>
-        <Text style={styles.subtitle}>البطاقات الذكية</Text>
-        <Text style={styles.status}>✅ المشروع جاهز للتطوير</Text>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PaperProvider theme={theme}>
+        <AppNavigator />
         <StatusBar style="auto" />
-      </View>
-    </PaperProvider>
+      </PaperProvider>
+    </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 18,
-    color: colors.primary,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  status: {
-    fontSize: 16,
-    color: colors.success,
-    textAlign: 'center',
-    marginTop: 20,
-  },
-});
