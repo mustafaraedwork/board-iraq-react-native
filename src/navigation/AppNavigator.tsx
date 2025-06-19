@@ -1,4 +1,4 @@
-// src/navigation/AppNavigator.tsx - Updated Version
+// src/navigation/AppNavigator.tsx - مُصحح
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import LoginScreen from '../screens/auth/LoginScreen';
 import TabNavigator from './TabNavigator';
+import { useAppTheme } from '../contexts/ThemeContext';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -27,7 +28,8 @@ const LoginScreenWrapper: React.FC = () => {
 const Stack = createStackNavigator<RootStackParamList>();
 
 const AppNavigator: React.FC = () => {
-  const theme = useTheme();
+  const paperTheme = useTheme();
+  const { isDark } = useAppTheme();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -69,16 +71,65 @@ const AppNavigator: React.FC = () => {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>جاري التحميل...</Text>
+      <View style={[
+        styles.container, 
+        styles.centered, 
+        { backgroundColor: paperTheme.colors.background }
+      ]}>
+        <ActivityIndicator 
+          size="large" 
+          color={paperTheme.colors.primary} 
+          style={styles.loader}
+        />
+        <Text style={[
+          styles.loadingText, 
+          { color: paperTheme.colors.onBackground }
+        ]}>
+          جاري التحميل...
+        </Text>
       </View>
     );
   }
 
+  // تخصيص ألوان التنقل حسب الثيم - مُصحح
+  const navigationTheme = {
+    dark: isDark,
+    colors: {
+      primary: paperTheme.colors.primary,
+      background: paperTheme.colors.background,
+      card: paperTheme.colors.surface,
+      text: paperTheme.colors.onSurface,
+      border: paperTheme.colors.outline,
+      notification: paperTheme.colors.primary,
+    },
+    fonts: {
+      regular: {
+        fontFamily: 'System',
+        fontWeight: 'normal' as const,
+      },
+      medium: {
+        fontFamily: 'System',
+        fontWeight: '500' as const,
+      },
+      bold: {
+        fontFamily: 'System',
+        fontWeight: 'bold' as const,
+      },
+      heavy: {
+        fontFamily: 'System',
+        fontWeight: '700' as const,
+      },
+    },
+  };
+
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <NavigationContainer theme={navigationTheme}>
+      <Stack.Navigator 
+        screenOptions={{ 
+          headerShown: false,
+          cardStyle: { backgroundColor: paperTheme.colors.background },
+        }}
+      >
         {isLoggedIn ? (
           <Stack.Screen name="Main" component={TabNavigator} />
         ) : (
@@ -97,9 +148,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loader: {
+    marginBottom: 16,
+  },
   loadingText: {
-    marginTop: 16,
     fontSize: 16,
+    fontWeight: '500',
   },
 });
 
