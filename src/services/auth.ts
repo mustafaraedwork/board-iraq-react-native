@@ -1,174 +1,197 @@
-// src/services/auth.ts
+// src/services/auth.ts - إصدار محدث لإصلاح مشكلة الانتقال
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
-import { User } from '../types';
-
-export interface LoginCredentials {
-  username: string;
-  password: string;
-}
-
-export interface AuthResponse {
-  success: boolean;
-  user?: User;
-  error?: string;
-}
+import type { User } from '../types';
 
 class AuthService {
-  private readonly USER_STORAGE_KEY = 'currentUser';
-  private readonly AUTH_TOKEN_KEY = 'authToken';
-
-  /**
-   * تسجيل الدخول
-   */
-  async login(credentials: LoginCredentials): Promise<AuthResponse> {
+  
+  async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
-      const { username, password } = credentials;
+      console.log('🔐 بدء عملية تسجيل الدخول:', username);
 
       // البحث عن المستخدم في قاعدة البيانات
       const { data: user, error } = await supabase
         .from('users')
         .select('*')
-        .eq('username', username.toLowerCase().trim())
-        .eq('is_active', true)
+        .eq('username', username)
         .single();
 
-      if (error || !user) {
-        return {
-          success: false,
-          error: 'اسم المستخدم غير موجود أو غير نشط'
-        };
+      if (error) {
+        console.error('❌ خطأ في قاعدة البيانات:', error);
+        return { success: false, error: 'خطأ في الاتصال بقاعدة البيانات' };
       }
 
-      // التحقق من كلمة المرور (بسيطة الآن، يمكن تحسينها لاحقاً)
-      if (user.password_hash !== password) {
-        return {
-          success: false,
-          error: 'كلمة المرور غير صحيحة'
-        };
+      if (!user) {
+        console.log('❌ المستخدم غير موجود');
+        return { success: false, error: 'اسم المستخدم غير صحيح' };
       }
+
+      // التحقق من كلمة المرور (بسيط - في التطبيق الحقيقي يجب استخدام hashing)
+      if (user.password_hash !== password) {
+        console.log('❌ كلمة المرور خاطئة');
+        return { success: false, error: 'كلمة المرور غير صحيحة' };
+      }
+
+      console.log('✅ تسجيل الدخول ناجح للمستخدم:', user.username);
 
       // حفظ بيانات المستخدم محلياً
-      await this.saveUserData(user);
+      await this.saveUserSession(user);
 
       // تحديث آخر زيارة
       await this.updateLastVisit(user.id);
 
-      return {
-        success: true,
-        user
-      };
+      return { success: true, user };
     } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        error: 'حدث خطأ في الاتصال. تحقق من الإنترنت.'
-      };
+      console.error('❌ خطأ في تسجيل الدخول:', error);
+      return { success: false, error: 'حدث خطأ غير متوقع' };
     }
   }
 
-  /**
-   * تسجيل الخروج
-   */
+  async saveUserSession(user: User): Promise<void> {
+    try {
+      console.log('💾 حفظ جلسة المستخدم...');
+      
+      // حفظ بيانات المستخدم
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      
+      // حفظ حالة تسجيل الدخول
+      await AsyncStorage.setItem('isAuthenticated', 'true');
+      
+      // حفظ timestamp للجلسة
+      await AsyncStorage.setItem('loginTimestamp', Date.now().toString());
+      
+      console.log('✅ تم حفظ الجلسة بنجاح');
+      
+      // التحقق من الحفظ
+      const savedAuth = await AsyncStorage.getItem('isAuthenticated');
+      const savedUser = await AsyncStorage.getItem('user');
+      
+      console.log('🔍 التحقق من الحفظ:', {
+        isAuthenticated: savedAuth,
+        userSaved: !!savedUser
+      });
+      
+    } catch (error) {
+      console.error('❌ خطأ في حفظ الجلسة:', error);
+      throw error;
+    }
+  }
+
+  async updateLastVisit(userId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ last_visit_at: new Date().toISOString() })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('خطأ في تحديث آخر زيارة:', error);
+      }
+    } catch (error) {
+      console.error('خطأ في تحديث آخر زيارة:', error);
+    }
+  }
+
   async logout(): Promise<void> {
     try {
-      // مسح البيانات المحلية
+      console.log('🚪 بدء عملية تسجيل الخروج...');
+      
+      // مسح جميع البيانات المحلية
       await AsyncStorage.multiRemove([
-        this.USER_STORAGE_KEY,
-        this.AUTH_TOKEN_KEY
+        'user',
+        'isAuthenticated',
+        'loginTimestamp'
       ]);
+      
+      console.log('✅ تم تسجيل الخروج بنجاح');
+      
+      // التحقق من المسح
+      const authCheck = await AsyncStorage.getItem('isAuthenticated');
+      console.log('🔍 التحقق من تسجيل الخروج:', { isAuthenticated: authCheck });
+      
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('❌ خطأ في تسجيل الخروج:', error);
     }
   }
 
-  /**
-   * جلب المستخدم الحالي من التخزين المحلي
-   */
+  async isLoggedIn(): Promise<boolean> {
+    try {
+      const isAuthenticated = await AsyncStorage.getItem('isAuthenticated');
+      const user = await AsyncStorage.getItem('user');
+      
+      const result = isAuthenticated === 'true' && user !== null;
+      
+      console.log('🔍 فحص حالة تسجيل الدخول:', {
+        isAuthenticated,
+        hasUser: !!user,
+        result
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('خطأ في فحص حالة تسجيل الدخول:', error);
+      return false;
+    }
+  }
+
   async getCurrentUser(): Promise<User | null> {
     try {
-      const userData = await AsyncStorage.getItem(this.USER_STORAGE_KEY);
-      return userData ? JSON.parse(userData) : null;
+      const userString = await AsyncStorage.getItem('user');
+      if (!userString) return null;
+
+      const user = JSON.parse(userString) as User;
+      return user;
     } catch (error) {
-      console.error('Get current user error:', error);
+      console.error('خطأ في جلب المستخدم الحالي:', error);
       return null;
     }
   }
 
-  /**
-   * التحقق من حالة تسجيل الدخول
-   */
-  async isLoggedIn(): Promise<boolean> {
-    const user = await this.getCurrentUser();
-    return user !== null;
-  }
-
-  /**
-   * حفظ بيانات المستخدم محلياً
-   */
-  private async saveUserData(user: User): Promise<void> {
+  // دالة للتحقق من صحة الجلسة
+  async validateSession(): Promise<boolean> {
     try {
-      await AsyncStorage.setItem(this.USER_STORAGE_KEY, JSON.stringify(user));
-      // يمكن إضافة token لاحقاً للأمان
-      await AsyncStorage.setItem(this.AUTH_TOKEN_KEY, `user_${user.id}`);
+      const isAuthenticated = await AsyncStorage.getItem('isAuthenticated');
+      const user = await AsyncStorage.getItem('user');
+      const loginTimestamp = await AsyncStorage.getItem('loginTimestamp');
+
+      if (isAuthenticated !== 'true' || !user || !loginTimestamp) {
+        return false;
+      }
+
+      // التحقق من عدم انتهاء الجلسة (24 ساعة)
+      const loginTime = parseInt(loginTimestamp);
+      const now = Date.now();
+      const timeDiff = now - loginTime;
+      const hoursElapsed = timeDiff / (1000 * 60 * 60);
+
+      if (hoursElapsed > 24) {
+        console.log('🕐 انتهت صلاحية الجلسة');
+        await this.logout();
+        return false;
+      }
+
+      return true;
     } catch (error) {
-      console.error('Save user data error:', error);
+      console.error('خطأ في التحقق من صحة الجلسة:', error);
+      return false;
     }
   }
 
-  /**
-   * تحديث آخر زيارة للمستخدم
-   */
-  private async updateLastVisit(userId: string): Promise<void> {
+  // دالة إضافية لفرض إعادة التحميل
+  async forceRefreshAuthState(): Promise<void> {
     try {
-      await supabase
-        .from('users')
-        .update({ 
-          last_visit_at: new Date().toISOString() 
-        })
-        .eq('id', userId);
+      console.log('🔄 فرض إعادة تحميل حالة المصادقة...');
+      
+      // مسح cache مؤقت
+      await AsyncStorage.setItem('forceRefresh', Date.now().toString());
+      
+      // إضافة تأخير صغير
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
     } catch (error) {
-      console.error('Update last visit error:', error);
-      // لا نوقف عملية تسجيل الدخول لأجل هذا الخطأ
-    }
-  }
-
-  /**
-   * تحديث بيانات المستخدم في التخزين المحلي
-   */
-  async updateLocalUser(updatedUser: User): Promise<void> {
-    try {
-      await AsyncStorage.setItem(this.USER_STORAGE_KEY, JSON.stringify(updatedUser));
-    } catch (error) {
-      console.error('Update local user error:', error);
-    }
-  }
-
-  /**
-   * جلب بيانات المستخدم المحدثة من قاعدة البيانات
-   */
-  async refreshUserData(): Promise<User | null> {
-    try {
-      const currentUser = await this.getCurrentUser();
-      if (!currentUser) return null;
-
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', currentUser.id)
-        .single();
-
-      if (error || !user) return currentUser;
-
-      // تحديث البيانات المحلية
-      await this.updateLocalUser(user);
-      return user;
-    } catch (error) {
-      console.error('Refresh user data error:', error);
-      return await this.getCurrentUser();
+      console.error('خطأ في فرض إعادة التحميل:', error);
     }
   }
 }
 
-// تصدير instance واحد ليتم استخدامه في جميع أنحاء التطبيق
 export const authService = new AuthService();

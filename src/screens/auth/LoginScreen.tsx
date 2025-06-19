@@ -1,57 +1,55 @@
-// src/screens/auth/LoginScreen.tsx
+// src/screens/auth/LoginScreen.tsx - إصدار محدث لإصلاح مشكلة الانتقال
 import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
-  ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  I18nManager,
+  Alert,
 } from 'react-native';
 import {
   TextInput,
   Button,
-  Text,
   Card,
   Title,
   Paragraph,
-  ActivityIndicator,
+  useTheme,
+  Text,
+  Surface,
 } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { authService, LoginCredentials } from '../../services/auth';
-import { colors, spacing } from '../../styles/colors';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-// Schema للتحقق من المدخلات
+import { authService } from '../../services/auth';
+
+// Props interface
+export interface LoginScreenProps {
+  onLoginSuccess: () => void;
+}
+
+// Form validation schema
 const loginSchema = z.object({
-  username: z
-    .string()
-    .min(1, 'اسم المستخدم مطلوب')
-    .min(3, 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل'),
-  password: z
-    .string()
-    .min(1, 'كلمة المرور مطلوبة')
-    .min(3, 'كلمة المرور يجب أن تكون 3 أحرف على الأقل'),
+  username: z.string().min(1, 'اسم المستخدم مطلوب'),
+  password: z.string().min(1, 'كلمة المرور مطلوبة'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-interface LoginScreenProps {
-  onLoginSuccess: () => void;
-}
-
-export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
-  const [isLoading, setIsLoading] = useState(false);
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+  const theme = useTheme();
+  const [loading, setLoading] = useState(false);
 
   const {
     control,
     handleSubmit,
-    formState: { errors, isValid },
-    reset,
+    setValue,
+    formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    mode: 'onChange',
     defaultValues: {
       username: '',
       password: '',
@@ -59,97 +57,95 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   });
 
   const onSubmit = async (data: LoginFormData) => {
-    setIsLoading(true);
+    setLoading(true);
     
     try {
-      const credentials: LoginCredentials = {
-        username: data.username.trim(),
-        password: data.password,
-      };
+      console.log('🔑 بدء تسجيل الدخول...', data.username);
+      
+      const result = await authService.login(data.username, data.password);
 
-      const response = await authService.login(credentials);
-
-      if (response.success && response.user) {
-        // نجح تسجيل الدخول
+      if (result.success && result.user) {
+        console.log('✅ تسجيل الدخول ناجح!');
+        
+        // فرض إعادة تحميل حالة المصادقة
+        await authService.forceRefreshAuthState();
+        
         Alert.alert(
-          'مرحباً بك!',
-          `أهلاً ${response.user.full_name || response.user.username}`,
+          'مرحباً!',
+          `مرحباً ${result.user.full_name || result.user.username}! تم تسجيل الدخول بنجاح`,
           [
             {
               text: 'متابعة',
               onPress: () => {
-                reset(); // مسح النموذج
-                onLoginSuccess(); // الانتقال للشاشة الرئيسية
-              },
-            },
+                console.log('🚀 استدعاء onLoginSuccess...');
+                onLoginSuccess();
+              }
+            }
           ]
         );
       } else {
-        // فشل تسجيل الدخول
-        Alert.alert(
-          'خطأ في تسجيل الدخول',
-          response.error || 'حدث خطأ غير متوقع',
-          [{ text: 'حسناً' }]
-        );
+        console.log('❌ فشل تسجيل الدخول:', result.error);
+        Alert.alert('خطأ في تسجيل الدخول', result.error || 'حدث خطأ غير متوقع');
       }
     } catch (error) {
-      Alert.alert(
-        'خطأ في الاتصال',
-        'تحقق من اتصال الإنترنت وحاول مرة أخرى',
-        [{ text: 'حسناً' }]
-      );
+      console.error('❌ خطأ في تسجيل الدخول:', error);
+      Alert.alert('خطأ', 'حدث خطأ في الاتصال بالخادم');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const fillDemoData = () => {
-    reset({
-      username: 'demo123',
-      password: 'demo123',
-    });
+  const fillDemoCredentials = () => {
+    setValue('username', 'demo123');
+    setValue('password', 'demo123');
   };
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
         {/* Header */}
         <View style={styles.header}>
-          <Title style={styles.title}>Board Iraq</Title>
-          <Paragraph style={styles.subtitle}>البطاقات الذكية</Paragraph>
-          <Text style={styles.description}>
-            سجل دخولك للوصول إلى لوحة التحكم
-          </Text>
+          <Surface style={[styles.logoContainer, { backgroundColor: theme.colors.primary }]}>
+            <MaterialCommunityIcons
+              name="card-account-details"
+              size={48}
+              color="white"
+            />
+          </Surface>
+          <Title style={[styles.title, { color: theme.colors.primary }]}>
+            Board Iraq
+          </Title>
+          <Paragraph style={styles.subtitle}>
+            تسجيل الدخول إلى حسابك
+          </Paragraph>
         </View>
 
         {/* Login Form */}
-        <Card style={styles.card}>
+        <Card style={styles.formCard}>
           <Card.Content>
-            <Title style={styles.cardTitle}>تسجيل الدخول</Title>
+            <Title style={styles.formTitle}>تسجيل الدخول</Title>
 
             {/* Username Field */}
             <Controller
               control={control}
               name="username"
-              render={({ field: { onChange, onBlur, value } }) => (
+              render={({ field: { onChange, value } }) => (
                 <TextInput
                   label="اسم المستخدم"
-                  mode="outlined"
                   value={value}
                   onChangeText={onChange}
-                  onBlur={onBlur}
-                  error={!!errors.username}
+                  mode="outlined"
                   style={styles.input}
+                  error={!!errors.username}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  disabled={isLoading}
-                  right={<TextInput.Icon icon="account" />}
+                  left={<TextInput.Icon icon="account" />}
                 />
               )}
             />
@@ -161,18 +157,18 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <Controller
               control={control}
               name="password"
-              render={({ field: { onChange, onBlur, value } }) => (
+              render={({ field: { onChange, value } }) => (
                 <TextInput
                   label="كلمة المرور"
-                  mode="outlined"
                   value={value}
                   onChangeText={onChange}
-                  onBlur={onBlur}
-                  error={!!errors.password}
+                  mode="outlined"
                   style={styles.input}
+                  error={!!errors.password}
                   secureTextEntry
-                  disabled={isLoading}
-                  right={<TextInput.Icon icon="lock" />}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  left={<TextInput.Icon icon="lock" />}
                 />
               )}
             />
@@ -184,131 +180,120 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <Button
               mode="contained"
               onPress={handleSubmit(onSubmit)}
+              loading={loading}
+              disabled={loading}
               style={styles.loginButton}
+              icon="login"
               contentStyle={styles.buttonContent}
-              disabled={!isValid || isLoading}
-              loading={isLoading}
             >
-              {isLoading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
+              {loading ? 'جاري التسجيل...' : 'تسجيل الدخول'}
             </Button>
 
-            {/* Demo Button */}
+            {/* Demo Account Button */}
             <Button
               mode="outlined"
-              onPress={fillDemoData}
+              onPress={fillDemoCredentials}
+              disabled={loading}
               style={styles.demoButton}
-              disabled={isLoading}
+              icon="account-cog"
+              contentStyle={styles.buttonContent}
             >
               تجربة الحساب التجريبي
             </Button>
           </Card.Content>
         </Card>
 
-        {/* Loading Indicator */}
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>جاري التحقق من البيانات...</Text>
-          </View>
-        )}
-
-        {/* Footer */}
+        {/* App Info */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Board Iraq © 2025
+            تطبيق البطاقات الذكية الرقمية
           </Text>
-          <Text style={styles.footerContact}>
-            للدعم: {process.env.EXPO_PUBLIC_CONTACT_PHONE}
+          <Text style={styles.versionText}>
+            الإصدار 1.0.0
           </Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  scrollContainer: {
+  scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.md,
+    padding: 20,
   },
   header: {
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: 32,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    elevation: 4,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: colors.text,
+    marginBottom: 8,
     textAlign: 'center',
-    marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: 18,
-    color: colors.primary,
+    fontSize: 16,
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    opacity: 0.7,
   },
-  description: {
-    fontSize: 14,
-    color: colors.gray[600],
-    textAlign: 'center',
-  },
-  card: {
-    marginBottom: spacing.lg,
+  formCard: {
     elevation: 4,
-    backgroundColor: colors.white,
+    marginBottom: 24,
   },
-  cardTitle: {
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-    color: colors.text,
+  formTitle: {
+    fontSize: 20,
+    marginBottom: 24,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   input: {
-    marginBottom: spacing.sm,
-    backgroundColor: colors.white,
+    marginBottom: 8,
+    backgroundColor: 'transparent',
   },
   errorText: {
-    color: colors.error,
+    color: '#F44336',
     fontSize: 12,
-    marginBottom: spacing.sm,
-    marginLeft: spacing.sm,
+    marginBottom: 16,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   loginButton: {
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.primary,
-  },
-  buttonContent: {
-    paddingVertical: spacing.xs,
+    marginTop: 16,
+    marginBottom: 12,
   },
   demoButton: {
-    borderColor: colors.primary,
+    marginBottom: 8,
   },
-  loadingContainer: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-  },
-  loadingText: {
-    marginTop: spacing.sm,
-    color: colors.gray[600],
-    fontSize: 14,
+  buttonContent: {
+    height: 48,
   },
   footer: {
     alignItems: 'center',
-    marginTop: spacing.xl,
+    marginTop: 24,
   },
   footerText: {
-    color: colors.gray[500],
-    fontSize: 12,
-    marginBottom: spacing.xs,
+    fontSize: 14,
+    opacity: 0.7,
+    textAlign: 'center',
+    marginBottom: 4,
   },
-  footerContact: {
-    color: colors.gray[500],
+  versionText: {
     fontSize: 12,
+    opacity: 0.5,
+    textAlign: 'center',
   },
 });
+
+export default LoginScreen;

@@ -1,3 +1,4 @@
+// src/types/index.ts - إصدار محدث مع إصلاح UserLink
 export interface User {
   id: string;
   username: string;
@@ -33,7 +34,7 @@ export interface UserLink {
   url: string;
   icon?: string;
   is_active: boolean;
-  sort_order: number;
+  sort_order: number; // العمود الصحيح في قاعدة البيانات
   click_count: number;
   created_at: string;
   updated_at: string;
@@ -47,3 +48,54 @@ export type RootStackParamList = {
   Profile: { username: string };
   Admin: undefined;
 };
+
+// Navigation types for Tab Navigator
+export type TabParamList = {
+  Overview: undefined;
+  Profile: undefined;
+  Links: undefined;
+  Stats: undefined;
+};
+
+// Auth types
+export interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+export interface AuthResult {
+  success: boolean;
+  user?: User;
+  error?: string;
+}
+
+// Form types
+export interface ProfileFormData {
+  full_name?: string;
+  email?: string;
+  phone?: string;
+  job_title?: string;
+  company?: string;
+  bio?: string;
+}
+
+export interface LinkFormData {
+  title: string;
+  url: string;
+  icon: string;
+}
+
+// Statistics types
+export interface VisitStats {
+  total_visits: number;
+  total_clicks: number;
+  today_visits: number;
+  this_week_visits: number;
+  this_month_visits: number;
+}
+
+export interface LinkStats {
+  link: UserLink;
+  click_count: number;
+  percentage: number;
+}

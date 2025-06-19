@@ -29,10 +29,6 @@ npx expo install react-native-screens react-native-safe-area-context
 ### 3. إعداد متغيرات البيئة
 تأكد من وجود ملف `.env` في جذر المشروع:
 
-```env
-# Supabase Configuration (نفس قاعدة البيانات من Next.js)
-EXPO_PUBLIC_SUPABASE_URL=https://icqvknhbhnsllnkpajmo.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljcXZrbmhiaG5zbGxua3Bham1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyNDY2OTcsImV4cCI6MjA2NDgyMjY5N30.d0hsO7su0LrxFQQ_JkNy2q3mUxNSdI4dfejyO4gCznk
 
 # معلومات التطبيق
 EXPO_PUBLIC_APP_NAME=Board Iraq
