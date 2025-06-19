@@ -1,4 +1,4 @@
-// src/screens/dashboard/ProfileEditScreen.tsx - مع ميزة رفع الصور المتكاملة
+// src/screens/dashboard/ProfileEditScreen.tsx - بسيط ومُبسط تماماً
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -43,12 +43,12 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 
 const { width: screenWidth } = Dimensions.get('window');
 
-// Preset colors for theming
+// Preset colors for theming - بدون تكرار
 const PRESET_COLORS = [
   '#1976D2', '#2196F3', '#03A9F4', '#00BCD4', '#009688', '#4CAF50',
   '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107', '#FF9800', '#FF5722',
-  '#F44336', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3',
-  '#607D8B', '#795548', '#9E9E9E', '#424242', '#212121', '#000000',
+  '#F44336', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#607D8B',
+  '#795548', '#9E9E9E', '#424242', '#212121', '#000000', '#FFFFFF',
 ];
 
 const ProfileEditScreen: React.FC = () => {
@@ -69,37 +69,29 @@ const ProfileEditScreen: React.FC = () => {
     formState: { errors },
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      full_name: '',
-      email: '',
-      phone: '',
-      job_title: '',
-      company: '',
-      bio: '',
-    },
   });
 
   useEffect(() => {
-    loadUserData();
+    loadUserProfile();
   }, []);
 
-  const loadUserData = async () => {
+  const loadUserProfile = async () => {
     try {
-      const userData = await AsyncStorage.getItem('user');
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
+      const userDataStr = await AsyncStorage.getItem('user');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        setUser(userData);
         
-        // تعبئة النموذج
-        setValue('full_name', parsedUser.full_name || '');
-        setValue('email', parsedUser.email || '');
-        setValue('phone', parsedUser.phone || '');
-        setValue('job_title', parsedUser.job_title || '');
-        setValue('company', parsedUser.company || '');
-        setValue('bio', parsedUser.bio || '');
+        // Set form values
+        setValue('full_name', userData.full_name || '');
+        setValue('email', userData.email || '');
+        setValue('phone', userData.phone || '');
+        setValue('job_title', userData.job_title || '');
+        setValue('company', userData.company || '');
+        setValue('bio', userData.bio || '');
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('Error loading user profile:', error);
       Alert.alert('خطأ', 'حدث خطأ في تحميل البيانات');
     } finally {
       setLoading(false);
@@ -111,90 +103,56 @@ const ProfileEditScreen: React.FC = () => {
 
     setSaving(true);
     try {
+      const updatedData = {
+        ...data,
+        updated_at: new Date().toISOString(),
+      };
+
       const { error } = await supabase
         .from('users')
-        .update({
-          full_name: data.full_name || null,
-          email: data.email || null,
-          phone: data.phone || null,
-          job_title: data.job_title || null,
-          company: data.company || null,
-          bio: data.bio || null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatedData)
         .eq('id', user.id);
 
       if (error) {
-        Alert.alert('خطأ', 'حدث خطأ أثناء حفظ البيانات');
-        console.error('Error updating profile:', error);
-      } else {
-        // تحديث البيانات المحلية
-        const updatedUser = { ...user, ...data };
-        setUser(updatedUser);
-        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-        
-        Alert.alert('نجح', 'تم تحديث الملف الشخصي بنجاح');
+        throw error;
       }
+
+      // Update local user data
+      const updatedUser = { ...user, ...updatedData };
+      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+
+      Alert.alert('✅ تم الحفظ', 'تم حفظ التغييرات بنجاح');
     } catch (error) {
       console.error('Error updating profile:', error);
-      Alert.alert('خطأ', 'حدث خطأ أثناء حفظ البيانات');
+      Alert.alert('خطأ', 'حدث خطأ أثناء حفظ التغييرات');
     } finally {
       setSaving(false);
     }
   };
 
-  // تحديث الصورة الشخصية
-  const handleImageUpdate = async (newImageUrl: string | null) => {
-    if (!user) return;
-
-    try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          profile_image_url: newImageUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-
-      if (error) {
-        console.error('Error updating profile image:', error);
-        Alert.alert('خطأ', 'حدث خطأ أثناء تحديث الصورة');
-      } else {
-        // تحديث البيانات المحلية
-        const updatedUser = { ...user, profile_image_url: newImageUrl || undefined };
-        setUser(updatedUser);
-        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-      }
-    } catch (error) {
-      console.error('Error updating profile image:', error);
-      Alert.alert('خطأ', 'حدث خطأ أثناء تحديث الصورة');
-    }
+  const openColorPicker = (type: 'background' | 'text' | 'button') => {
+    setSelectedColorType(type);
+    setColorModalVisible(true);
   };
 
-  const updateColor = async (colorType: 'background' | 'text' | 'button', color: string) => {
+  const updateColor = async (type: 'background' | 'text' | 'button', color: string) => {
     if (!user) return;
 
     try {
-      const updateData: any = {};
-      updateData[`${colorType}_color`] = color;
-      updateData.updated_at = new Date().toISOString();
-
+      const colorField = `${type}_color`;
       const { error } = await supabase
         .from('users')
-        .update(updateData)
+        .update({ [colorField]: color })
         .eq('id', user.id);
 
-      if (error) {
-        console.error('Error updating color:', error);
-        Alert.alert('خطأ', 'حدث خطأ أثناء تحديث اللون');
-      } else {
-        // تحديث البيانات المحلية
-        const updatedUser = { ...user, ...updateData };
-        setUser(updatedUser);
-        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-        
-        setColorModalVisible(false);
-      }
+      if (error) throw error;
+
+      // Update local user data
+      const updatedUser = { ...user, [colorField]: color };
+      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setColorModalVisible(false);
     } catch (error) {
       console.error('Error updating color:', error);
       Alert.alert('خطأ', 'حدث خطأ أثناء تحديث اللون');
@@ -210,15 +168,31 @@ const ProfileEditScreen: React.FC = () => {
     }
   };
 
-  const openColorPicker = (type: 'background' | 'text' | 'button') => {
-    setSelectedColorType(type);
-    setColorModalVisible(true);
+  const handleImageUpdate = (newImageUrl: string | null) => {
+    if (user) {
+      const updatedUser = { 
+        ...user, 
+        profile_image_url: newImageUrl || undefined 
+      };
+      setUser(updatedUser);
+      AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
+  const getCurrentColor = (type: 'background' | 'text' | 'button'): string => {
+    if (!user) return '#2196F3';
+    switch (type) {
+      case 'background': return user.background_color || '#FFFFFF';
+      case 'text': return user.text_color || '#000000';
+      case 'button': return user.button_color || '#2196F3';
+      default: return '#2196F3';
+    }
   };
 
   if (loading) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: paperTheme.colors.background }]}>
-        <Text style={{ color: paperTheme.colors.onBackground }}>جاري التحميل...</Text>
+        <Text>جاري التحميل...</Text>
       </View>
     );
   }
@@ -226,7 +200,7 @@ const ProfileEditScreen: React.FC = () => {
   if (!user) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: paperTheme.colors.background }]}>
-        <Text style={{ color: paperTheme.colors.onBackground }}>لم يتم العثور على بيانات المستخدم</Text>
+        <Text>لم يتم العثور على بيانات المستخدم</Text>
       </View>
     );
   }
@@ -236,56 +210,49 @@ const ProfileEditScreen: React.FC = () => {
       <ScrollView
         style={[styles.container, { backgroundColor: paperTheme.colors.background }]}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Profile Image Card */}
-        <Card style={[styles.card, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
-          <Card.Content>
+        {/* Profile Image Section */}
+        <Card style={[styles.card, shadows.medium]} mode="elevated">
+          <Card.Content style={styles.imageSection}>
             <Title style={[styles.sectionTitle, { color: paperTheme.colors.onSurface }]}>
               الصورة الشخصية
             </Title>
             
-            <View style={styles.imageSection}>
-              <ProfileImagePicker
-                imageUrl={user.profile_image_url}
-                userId={user.id}
-                onImageUpdate={handleImageUpdate}
-                size={120}
-                showEditButton={true}
-              />
-              <Text style={[styles.imageHint, { color: paperTheme.colors.onSurface }]}>
-                اضغط على الصورة لتغييرها أو حذفها
-              </Text>
-            </View>
+            <ProfileImagePicker
+              imageUrl={user.profile_image_url}
+              userId={user.id}
+              onImageUpdate={handleImageUpdate}
+              size={120}
+              showEditButton={true}
+            />
+            
+            <Text style={[styles.imageHint, { color: paperTheme.colors.onSurfaceVariant }]}>
+              اضغط على الصورة لتغييرها أو حذفها
+            </Text>
           </Card.Content>
         </Card>
 
-        {/* Personal Information Card */}
-        <Card style={[styles.card, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
+        {/* Personal Information Section */}
+        <Card style={[styles.card, shadows.medium]} mode="elevated">
           <Card.Content>
             <Title style={[styles.sectionTitle, { color: paperTheme.colors.onSurface }]}>
               المعلومات الشخصية
             </Title>
-            
+
+            {/* Full Name */}
             <Controller
-              control={control}
               name="full_name"
+              control={control}
               render={({ field: { onChange, value } }) => (
                 <TextInput
-                  label="الاسم الكامل"
+                  label="الاسم الكامل *"
                   value={value}
                   onChangeText={onChange}
-                  mode="outlined"
                   style={styles.input}
+                  mode="outlined"
                   error={!!errors.full_name}
                   right={<TextInput.Icon icon="account" />}
-                  theme={{
-                    colors: {
-                      primary: paperTheme.colors.primary,
-                      background: paperTheme.colors.background,
-                      surface: paperTheme.colors.surface,
-                      error: paperTheme.colors.error,
-                    },
-                  }}
                 />
               )}
             />
@@ -295,27 +262,21 @@ const ProfileEditScreen: React.FC = () => {
               </Text>
             )}
 
+            {/* Email */}
             <Controller
-              control={control}
               name="email"
+              control={control}
               render={({ field: { onChange, value } }) => (
                 <TextInput
                   label="البريد الإلكتروني"
                   value={value}
                   onChangeText={onChange}
-                  mode="outlined"
                   style={styles.input}
+                  mode="outlined"
                   keyboardType="email-address"
+                  autoCapitalize="none"
                   error={!!errors.email}
                   right={<TextInput.Icon icon="email" />}
-                  theme={{
-                    colors: {
-                      primary: paperTheme.colors.primary,
-                      background: paperTheme.colors.background,
-                      surface: paperTheme.colors.surface,
-                      error: paperTheme.colors.error,
-                    },
-                  }}
                 />
               )}
             />
@@ -325,106 +286,83 @@ const ProfileEditScreen: React.FC = () => {
               </Text>
             )}
 
+            {/* Phone */}
             <Controller
-              control={control}
               name="phone"
+              control={control}
               render={({ field: { onChange, value } }) => (
                 <TextInput
                   label="رقم الهاتف"
                   value={value}
                   onChangeText={onChange}
-                  mode="outlined"
                   style={styles.input}
+                  mode="outlined"
                   keyboardType="phone-pad"
                   right={<TextInput.Icon icon="phone" />}
-                  theme={{
-                    colors: {
-                      primary: paperTheme.colors.primary,
-                      background: paperTheme.colors.background,
-                      surface: paperTheme.colors.surface,
-                    },
-                  }}
                 />
               )}
             />
 
+            {/* Job Title */}
             <Controller
-              control={control}
               name="job_title"
+              control={control}
               render={({ field: { onChange, value } }) => (
                 <TextInput
                   label="المسمى الوظيفي"
                   value={value}
                   onChangeText={onChange}
-                  mode="outlined"
                   style={styles.input}
+                  mode="outlined"
                   right={<TextInput.Icon icon="briefcase" />}
-                  theme={{
-                    colors: {
-                      primary: paperTheme.colors.primary,
-                      background: paperTheme.colors.background,
-                      surface: paperTheme.colors.surface,
-                    },
-                  }}
                 />
               )}
             />
 
+            {/* Company */}
             <Controller
-              control={control}
               name="company"
+              control={control}
               render={({ field: { onChange, value } }) => (
                 <TextInput
                   label="اسم الشركة"
                   value={value}
                   onChangeText={onChange}
-                  mode="outlined"
                   style={styles.input}
-                  right={<TextInput.Icon icon="office-building" />}
-                  theme={{
-                    colors: {
-                      primary: paperTheme.colors.primary,
-                      background: paperTheme.colors.background,
-                      surface: paperTheme.colors.surface,
-                    },
-                  }}
+                  mode="outlined"
+                  right={<TextInput.Icon icon="domain" />}
                 />
               )}
             />
 
+            {/* Bio */}
             <Controller
-              control={control}
               name="bio"
+              control={control}
               render={({ field: { onChange, value } }) => (
                 <TextInput
                   label="النبذة الشخصية"
                   value={value}
                   onChangeText={onChange}
-                  mode="outlined"
                   style={styles.input}
+                  mode="outlined"
                   multiline
-                  numberOfLines={3}
+                  numberOfLines={4}
+                  maxLength={500}
                   right={<TextInput.Icon icon="text" />}
-                  theme={{
-                    colors: {
-                      primary: paperTheme.colors.primary,
-                      background: paperTheme.colors.background,
-                      surface: paperTheme.colors.surface,
-                    },
-                  }}
                 />
               )}
             />
           </Card.Content>
         </Card>
 
-        {/* Theme Customization Card */}
-        <Card style={[styles.card, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
+        {/* Theme Customization Section */}
+        <Card style={[styles.card, shadows.medium]} mode="elevated">
           <Card.Content>
             <Title style={[styles.sectionTitle, { color: paperTheme.colors.onSurface }]}>
               تخصيص الألوان
             </Title>
-            
+
             {/* Background Color */}
             <View style={styles.colorSection}>
               <Text style={[styles.colorLabel, { color: paperTheme.colors.onSurface }]}>
@@ -433,14 +371,11 @@ const ProfileEditScreen: React.FC = () => {
               <TouchableOpacity onPress={() => openColorPicker('background')}>
                 <View style={[
                   styles.colorPreview,
-                  { backgroundColor: user.background_color },
+                  { backgroundColor: getCurrentColor('background') },
                   shadows.small,
                 ]}>
-                  <Text style={[
-                    styles.colorButton,
-                    { color: user.text_color }
-                  ]}>
-                    عينة النص
+                  <Text style={{ color: getCurrentColor('text') }}>
+                    معاينة الخلفية
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -454,14 +389,11 @@ const ProfileEditScreen: React.FC = () => {
               <TouchableOpacity onPress={() => openColorPicker('text')}>
                 <View style={[
                   styles.colorPreview,
-                  { backgroundColor: user.background_color },
+                  { backgroundColor: getCurrentColor('background') },
                   shadows.small,
                 ]}>
-                  <Text style={[
-                    styles.colorButton,
-                    { color: user.text_color }
-                  ]}>
-                    عينة النص
+                  <Text style={{ color: getCurrentColor('text') }}>
+                    معاينة النص
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -475,20 +407,15 @@ const ProfileEditScreen: React.FC = () => {
               <TouchableOpacity onPress={() => openColorPicker('button')}>
                 <View style={[
                   styles.colorPreview,
-                  { backgroundColor: user.background_color },
+                  { backgroundColor: getCurrentColor('background') },
                   shadows.small,
                 ]}>
                   <View style={[
-                    styles.colorButton,
-                    { 
-                      backgroundColor: user.button_color,
-                      borderRadius: 8,
-                      paddingHorizontal: 16,
-                      paddingVertical: 8,
-                    }
+                    styles.buttonPreview,
+                    { backgroundColor: getCurrentColor('button') }
                   ]}>
                     <Text style={{ color: '#FFFFFF' }}>
-                      عينة الزر
+                      معاينة الزر
                     </Text>
                   </View>
                 </View>
@@ -504,14 +431,13 @@ const ProfileEditScreen: React.FC = () => {
           loading={saving}
           disabled={saving}
           style={[styles.saveButton, shadows.medium]}
-          buttonColor={paperTheme.colors.primary}
-          textColor={paperTheme.colors.onPrimary}
+          icon="content-save"
         >
           {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
         </Button>
       </ScrollView>
 
-      {/* Color Picker Modal */}
+      {/* Simple Color Picker Modal */}
       <Portal>
         <Modal
           visible={colorModalVisible}
@@ -525,16 +451,38 @@ const ProfileEditScreen: React.FC = () => {
           <Title style={[styles.modalTitle, { color: paperTheme.colors.onSurface }]}>
             اختيار لون {getColorTypeName(selectedColorType)}
           </Title>
+
+          {/* Current Color Display */}
+          <View style={styles.currentColorSection}>
+            <Text style={[styles.currentColorLabel, { color: paperTheme.colors.onSurface }]}>
+              اللون الحالي:
+            </Text>
+            <View
+              style={[
+                styles.currentColorPreview,
+                { backgroundColor: getCurrentColor(selectedColorType) },
+                shadows.small,
+              ]}
+            />
+            <Text style={[styles.colorCode, { color: paperTheme.colors.onSurfaceVariant }]}>
+              {getCurrentColor(selectedColorType)}
+            </Text>
+          </View>
           
+          {/* Color Grid */}
           <View style={styles.colorGrid}>
-            {PRESET_COLORS.map((color) => (
+            {PRESET_COLORS.map((color, index) => (
               <TouchableOpacity
-                key={color}
+                key={`${color}-${index}`}
                 onPress={() => updateColor(selectedColorType, color)}
                 style={[
                   styles.colorOption,
                   { backgroundColor: color },
                   shadows.small,
+                  getCurrentColor(selectedColorType) === color && {
+                    borderWidth: 3,
+                    borderColor: paperTheme.colors.primary,
+                  },
                 ]}
               />
             ))}
@@ -545,7 +493,6 @@ const ProfileEditScreen: React.FC = () => {
               mode="outlined"
               onPress={() => setColorModalVisible(false)}
               style={styles.modalButton}
-              textColor={paperTheme.colors.onSurface}
             >
               إلغاء
             </Button>
@@ -612,9 +559,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
+    minHeight: 60,
+    justifyContent: 'center',
   },
-  colorButton: {
+  buttonPreview: {
     borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   saveButton: {
     marginTop: 8,
@@ -625,6 +576,7 @@ const styles = StyleSheet.create({
     margin: 20,
     borderRadius: 20,
     padding: 24,
+    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 18,
@@ -632,20 +584,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
+  currentColorSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  currentColorLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  currentColorPreview: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginBottom: 8,
+  },
+  colorCode: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 24,
+    gap: 8,
+    marginBottom: 20,
   },
   colorOption: {
-    width: (screenWidth * 0.9 - 48 - 44) / 4, // 4 colors per row with gaps
-    height: 50,
-    borderRadius: 12,
+    width: (screenWidth * 0.8 - 48 - 35) / 6, // 6 colors per row
+    height: 40,
+    borderRadius: 8,
     marginBottom: 8,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   modalActions: {
     flexDirection: 'row',
