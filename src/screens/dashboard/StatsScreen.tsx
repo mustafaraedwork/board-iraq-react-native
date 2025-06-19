@@ -1,4 +1,4 @@
-// src/screens/dashboard/StatsScreen.tsx
+// src/screens/dashboard/StatsScreen.tsx - مُصحح تماماً
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -94,16 +94,13 @@ const StatsScreen: React.FC = () => {
         return;
       }
 
-      // Simulate some additional stats (in real app, these would come from visit tracking tables)
-      const totalVisits = userData.total_visits || 0;
-      const totalClicks = userData.total_clicks || 0;
-      
+      // Simulate some additional stats (in real app, these would come from analytics tables)
       setVisitStats({
-        total_visits: totalVisits,
-        total_clicks: totalClicks,
-        today_visits: Math.floor(totalVisits * 0.1), // 10% of total visits today (mock)
-        this_week_visits: Math.floor(totalVisits * 0.3), // 30% this week (mock)
-        this_month_visits: Math.floor(totalVisits * 0.6), // 60% this month (mock)
+        total_visits: userData.total_visits || 0,
+        total_clicks: userData.total_clicks || 0,
+        today_visits: Math.floor((userData.total_visits || 0) * 0.1), // 10% of total as today
+        this_week_visits: Math.floor((userData.total_visits || 0) * 0.3), // 30% as this week
+        this_month_visits: Math.floor((userData.total_visits || 0) * 0.6), // 60% as this month
       });
     } catch (error) {
       console.error('Error loading visit stats:', error);
@@ -112,22 +109,22 @@ const StatsScreen: React.FC = () => {
 
   const loadLinkStats = async (userId: string) => {
     try {
-      const { data: links, error } = await supabase
+      const { data: links, error: linksError } = await supabase
         .from('user_links')
         .select('*')
         .eq('user_id', userId)
         .eq('is_active', true)
         .order('click_count', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching link stats:', error);
+      if (linksError) {
+        console.error('Error fetching links:', linksError);
         return;
       }
 
       if (links && links.length > 0) {
         const totalClicks = links.reduce((sum, link) => sum + (link.click_count || 0), 0);
         
-        const statsWithPercentage: LinkStats[] = links.map(link => ({
+        const statsWithPercentage = links.map((link) => ({
           link,
           click_count: link.click_count || 0,
           percentage: totalClicks > 0 ? ((link.click_count || 0) / totalClicks) * 100 : 0,
@@ -202,10 +199,10 @@ const StatsScreen: React.FC = () => {
           <Title style={styles.sectionTitle}>فترة العرض</Title>
           <View style={styles.periodContainer}>
             {[
-              { key: 'today', label: 'اليوم' },
-              { key: 'week', label: 'الأسبوع' },
-              { key: 'month', label: 'الشهر' },
-              { key: 'all', label: 'الإجمالي' },
+              { key: 'today', label: 'اليوم', icon: 'calendar-today' },
+              { key: 'week', label: 'الأسبوع', icon: 'calendar-week' },
+              { key: 'month', label: 'الشهر', icon: 'calendar-month' },
+              { key: 'all', label: 'الإجمالي', icon: 'calendar-multiple' },
             ].map((period) => (
               <Chip
                 key={period.key}
@@ -213,6 +210,7 @@ const StatsScreen: React.FC = () => {
                 selected={selectedPeriod === period.key}
                 onPress={() => setSelectedPeriod(period.key as any)}
                 style={styles.periodChip}
+                icon={period.icon}
               >
                 {period.label}
               </Chip>
@@ -221,58 +219,36 @@ const StatsScreen: React.FC = () => {
         </Card.Content>
       </Card>
 
-      {/* Main Statistics */}
+      {/* Main Stats */}
       <Card style={styles.card}>
         <Card.Content>
           <Title style={styles.sectionTitle}>إحصائيات {getPeriodLabel()}</Title>
-          <View style={styles.mainStatsContainer}>
-            <Surface style={[styles.statCard, { backgroundColor: theme.colors.primaryContainer }]}>
+          
+          <View style={styles.statsGrid}>
+            <Surface style={styles.statItem}>
               <MaterialCommunityIcons
                 name="eye"
                 size={32}
                 color={theme.colors.primary}
               />
-              <Text style={[styles.statNumber, { color: theme.colors.primary }]}>
-                {getStatsByPeriod()}
-              </Text>
-              <Text style={styles.statLabel}>زيارة للملف</Text>
+              <Text style={styles.statNumber}>{getStatsByPeriod()}</Text>
+              <Text style={styles.statLabel}>زيارة</Text>
             </Surface>
-
-            <Surface style={[styles.statCard, { backgroundColor: theme.colors.secondaryContainer }]}>
+            
+            <Surface style={styles.statItem}>
               <MaterialCommunityIcons
-                name="cursor-pointer"
+                name="mouse-variant"
                 size={32}
                 color={theme.colors.secondary}
               />
-              <Text style={[styles.statNumber, { color: theme.colors.secondary }]}>
-                {selectedPeriod === 'all' ? visitStats.total_clicks : Math.floor(visitStats.total_clicks * 0.3)}
-              </Text>
-              <Text style={styles.statLabel}>نقرة على الروابط</Text>
+              <Text style={styles.statNumber}>{visitStats.total_clicks}</Text>
+              <Text style={styles.statLabel}>نقرة</Text>
             </Surface>
-          </View>
-
-          {/* Additional Stats */}
-          <View style={styles.additionalStats}>
-            <View style={styles.additionalStatItem}>
-              <Text style={styles.additionalStatLabel}>معدل النقر:</Text>
-              <Text style={styles.additionalStatValue}>
-                {visitStats.total_visits > 0 
-                  ? `${((visitStats.total_clicks / visitStats.total_visits) * 100).toFixed(1)}%`
-                  : '0%'
-                }
-              </Text>
-            </View>
-            <View style={styles.additionalStatItem}>
-              <Text style={styles.additionalStatLabel}>متوسط النقرات اليومية:</Text>
-              <Text style={styles.additionalStatValue}>
-                {Math.floor(visitStats.total_clicks / 30) || 0}
-              </Text>
-            </View>
           </View>
         </Card.Content>
       </Card>
 
-      {/* Link Performance */}
+      {/* Top Links Performance */}
       <Card style={styles.card}>
         <Card.Content>
           <Title style={styles.sectionTitle}>أداء الروابط</Title>
@@ -334,118 +310,8 @@ const StatsScreen: React.FC = () => {
                   </View>
                 </Surface>
               ))}
-              
-              {linkStats.length > 5 && (
-                <Text style={styles.moreLinksText}>
-                  وعرض {linkStats.length - 5} روابط أخرى...
-                </Text>
-              )}
             </View>
           )}
-        </Card.Content>
-      </Card>
-
-      {/* Time-based Analytics */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>التحليل الزمني</Title>
-          
-          <View style={styles.timeAnalytics}>
-            <List.Item
-              title="الزيارات اليوم"
-              description={`${visitStats.today_visits} زيارة`}
-              left={() => (
-                <List.Icon icon="today" color={theme.colors.primary} />
-              )}
-              right={() => (
-                <Text style={styles.percentageText}>
-                  {visitStats.total_visits > 0 
-                    ? `${((visitStats.today_visits / visitStats.total_visits) * 100).toFixed(1)}%`
-                    : '0%'
-                  }
-                </Text>
-              )}
-            />
-            
-            <List.Item
-              title="الزيارات هذا الأسبوع"
-              description={`${visitStats.this_week_visits} زيارة`}
-              left={() => (
-                <List.Icon icon="calendar-week" color={theme.colors.secondary} />
-              )}
-              right={() => (
-                <Text style={styles.percentageText}>
-                  {visitStats.total_visits > 0 
-                    ? `${((visitStats.this_week_visits / visitStats.total_visits) * 100).toFixed(1)}%`
-                    : '0%'
-                  }
-                </Text>
-              )}
-            />
-            
-            <List.Item
-              title="الزيارات هذا الشهر"
-              description={`${visitStats.this_month_visits} زيارة`}
-              left={() => (
-                <List.Icon icon="calendar-month" color={theme.colors.tertiary} />
-              )}
-              right={() => (
-                <Text style={styles.percentageText}>
-                  {visitStats.total_visits > 0 
-                    ? `${((visitStats.this_month_visits / visitStats.total_visits) * 100).toFixed(1)}%`
-                    : '0%'
-                  }
-                </Text>
-              )}
-            />
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Account Summary */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>ملخص الحساب</Title>
-          
-          <View style={styles.accountSummary}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>تاريخ الانضمام:</Text>
-              <Text style={styles.summaryValue}>
-                {user.created_at 
-                  ? new Date(user.created_at).toLocaleDateString('ar')
-                  : 'غير محدد'
-                }
-              </Text>
-            </View>
-            
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>عدد الروابط النشطة:</Text>
-              <Text style={styles.summaryValue}>
-                {linkStats.length} رابط
-              </Text>
-            </View>
-            
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>آخر تحديث للملف:</Text>
-              <Text style={styles.summaryValue}>
-                {user.updated_at 
-                  ? new Date(user.updated_at).toLocaleDateString('ar')
-                  : 'لم يتم التحديث'
-                }
-              </Text>
-            </View>
-            
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>نوع الحساب:</Text>
-              <Chip
-                mode="outlined"
-                icon={user.is_premium ? 'star' : 'account'}
-                compact
-              >
-                {user.is_premium ? 'حساب مميز' : 'حساب عادي'}
-              </Chip>
-            </View>
-          </View>
         </Card.Content>
       </Card>
     </ScrollView>
@@ -480,17 +346,17 @@ const styles = StyleSheet.create({
   periodChip: {
     marginBottom: 8,
   },
-  mainStatsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+  statsGrid: {
+    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
   },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
+  statItem: {
     alignItems: 'center',
-    elevation: 1,
+    padding: 20,
+    borderRadius: 12,
+    minWidth: width * 0.4,
+    marginBottom: 8,
   },
   statNumber: {
     fontSize: 24,
@@ -498,26 +364,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 14,
+    opacity: 0.7,
     marginTop: 4,
-    textAlign: 'center',
-  },
-  additionalStats: {
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    paddingTop: 16,
-  },
-  additionalStatItem: {
-    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  additionalStatLabel: {
-    fontSize: 14,
-  },
-  additionalStatValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   emptyState: {
     alignItems: 'center',
@@ -542,15 +391,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   linkStatItem: {
-    padding: 12,
-    borderRadius: 8,
-    elevation: 1,
+    padding: 16,
+    borderRadius: 12,
   },
   linkStatHeader: {
     flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   linkStatInfo: {
     flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
@@ -564,55 +412,22 @@ const styles = StyleSheet.create({
   },
   linkStatTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: I18nManager.isRTL ? 'right' : 'left',
+    fontWeight: '600',
+    marginBottom: 2,
   },
   linkStatSubtitle: {
     fontSize: 12,
     opacity: 0.7,
-    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   progressBarContainer: {
-    height: 4,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 2,
+    height: 6,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    borderRadius: 2,
-  },
-  moreLinksText: {
-    textAlign: 'center',
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 8,
-  },
-  timeAnalytics: {
-    gap: 8,
-  },
-  percentageText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  accountSummary: {
-    gap: 12,
-  },
-  summaryItem: {
-    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    flex: 1,
-    textAlign: I18nManager.isRTL ? 'right' : 'left',
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: I18nManager.isRTL ? 'left' : 'right',
+    borderRadius: 3,
   },
 });
 

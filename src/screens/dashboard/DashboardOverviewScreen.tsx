@@ -1,4 +1,4 @@
-// src/screens/dashboard/DashboardOverviewScreen.tsx - مُصحح تماماً
+// src/screens/dashboard/DashboardOverviewScreen.tsx - مع عرض الصورة الشخصية
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,6 +7,7 @@ import {
   RefreshControl,
   Alert,
   Linking,
+  I18nManager,
 } from 'react-native';
 import {
   Card,
@@ -23,6 +24,8 @@ import {
 } from 'react-native-paper';
 import { format } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+
 import { supabase } from '../../services/supabase';
 import { User } from '../../types';
 import { useAppTheme, useShadows } from '../../contexts/ThemeContext';
@@ -148,19 +151,28 @@ const DashboardOverviewScreen: React.FC = () => {
       <Card style={[styles.profileCard, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
         <Card.Content>
           <View style={styles.profileHeader}>
-            <Avatar.Text
-              size={80}
-              label={user.full_name?.charAt(0) || user.username.charAt(0)}
-              style={{ 
-                backgroundColor: user.background_color || paperTheme.colors.primary,
-                marginBottom: 16,
-              }}
-              labelStyle={{ 
-                color: user.text_color || paperTheme.colors.onPrimary,
-                fontSize: 32,
-                fontWeight: 'bold',
-              }}
-            />
+            {/* الصورة الشخصية مع دعم الصور المرفوعة */}
+            {user.profile_image_url ? (
+              <Avatar.Image
+                size={80}
+                source={{ uri: user.profile_image_url }}
+                style={{ 
+                  backgroundColor: user.background_color || paperTheme.colors.primary,
+                  marginBottom: 16,
+                }}
+              />
+            ) : (
+              <Avatar.Icon
+                size={80}
+                icon="account"
+                style={{ 
+                  backgroundColor: user.background_color || paperTheme.colors.primary,
+                  marginBottom: 16,
+                }}
+                color={user.text_color || paperTheme.colors.onPrimary}
+              />
+            )}
+            
             <View style={styles.profileInfo}>
               <Title style={[styles.userName, { color: paperTheme.colors.onSurface }]}>
                 {user.full_name || user.username}
@@ -231,15 +243,14 @@ const DashboardOverviewScreen: React.FC = () => {
         </Card.Content>
       </Card>
 
-      {/* Quick Stats Cards */}
+      {/* Statistics Cards */}
       <View style={styles.statsGrid}>
-        <Surface style={[styles.statCard, shadows.small, { backgroundColor: paperTheme.colors.surfaceVariant }]}>
+        <Surface style={[styles.statCard, shadows.small, { backgroundColor: paperTheme.colors.surface }]}>
           <View style={styles.statContent}>
-            <IconButton
-              icon="eye"
-              size={24}
-              iconColor={paperTheme.colors.primary}
-              style={{ margin: 0 }}
+            <MaterialCommunityIcons
+              name="eye"
+              size={32}
+              color={customColors.info}
             />
             <Text style={[styles.statNumber, { color: paperTheme.colors.onSurface }]}>
               {user.total_visits || 0}
@@ -250,13 +261,12 @@ const DashboardOverviewScreen: React.FC = () => {
           </View>
         </Surface>
 
-        <Surface style={[styles.statCard, shadows.small, { backgroundColor: paperTheme.colors.surfaceVariant }]}>
+        <Surface style={[styles.statCard, shadows.small, { backgroundColor: paperTheme.colors.surface }]}>
           <View style={styles.statContent}>
-            <IconButton
-              icon="cursor-pointer"
-              size={24}
-              iconColor={paperTheme.colors.secondary}
-              style={{ margin: 0 }}
+            <MaterialCommunityIcons
+              name="mouse-variant"
+              size={32}
+              color={customColors.success}
             />
             <Text style={[styles.statNumber, { color: paperTheme.colors.onSurface }]}>
               {user.total_clicks || 0}
@@ -268,139 +278,127 @@ const DashboardOverviewScreen: React.FC = () => {
         </Surface>
       </View>
 
-      {/* Account Information Card */}
+      {/* Account Information */}
       <Card style={[styles.infoCard, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
         <Card.Content>
           <Title style={[styles.sectionTitle, { color: paperTheme.colors.onSurface }]}>
             معلومات الحساب
           </Title>
-          
+
           <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
+            <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurface }]}>
               اسم المستخدم:
             </Text>
-            <Text style={[styles.infoValue, { color: paperTheme.colors.onSurface }]}>
+            <Text style={[styles.infoValue, { color: paperTheme.colors.onSurfaceVariant }]}>
               {user.username}
             </Text>
           </View>
 
+          {user.email && (
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurface }]}>
+                البريد الإلكتروني:
+              </Text>
+              <Text style={[styles.infoValue, { color: paperTheme.colors.onSurfaceVariant }]}>
+                {user.email}
+              </Text>
+            </View>
+          )}
+
+          {user.phone && (
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurface }]}>
+                رقم الهاتف:
+              </Text>
+              <Text style={[styles.infoValue, { color: paperTheme.colors.onSurfaceVariant }]}>
+                {user.phone}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
-              البريد الإلكتروني:
+            <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurface }]}>
+              تاريخ الإنشاء:
             </Text>
-            <Text style={[styles.infoValue, { color: paperTheme.colors.onSurface }]}>
-              {user.email || 'غير محدد'}
+            <Text style={[styles.infoValue, { color: paperTheme.colors.onSurfaceVariant }]}>
+              {format(new Date(user.created_at), 'dd/MM/yyyy')}
             </Text>
           </View>
 
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
-              تاريخ الانضمام:
-            </Text>
-            <Text style={[styles.infoValue, { color: paperTheme.colors.onSurface }]}>
-              {user.created_at ? format(new Date(user.created_at), 'dd/MM/yyyy') : 'غير محدد'}
-            </Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
-              آخر زيارة:
-            </Text>
-            <Text style={[styles.infoValue, { color: paperTheme.colors.onSurface }]}>
-              {user.last_visit_at ? format(new Date(user.last_visit_at), 'dd/MM/yyyy HH:mm') : 'غير محدد'}
-            </Text>
-          </View>
+          {user.last_visit_at && (
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurface }]}>
+                آخر زيارة:
+              </Text>
+              <Text style={[styles.infoValue, { color: paperTheme.colors.onSurfaceVariant }]}>
+                {format(new Date(user.last_visit_at), 'dd/MM/yyyy HH:mm')}
+              </Text>
+            </View>
+          )}
         </Card.Content>
       </Card>
 
-      {/* Company Information Card (if available) */}
-      {(user.company || user.job_title) && (
-        <Card style={[styles.infoCard, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
-          <Card.Content>
-            <Title style={[styles.sectionTitle, { color: paperTheme.colors.onSurface }]}>
-              معلومات العمل
-            </Title>
-            
-            {user.company && (
-              <View style={styles.infoRow}>
-                <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
-                  الشركة:
-                </Text>
-                <Text style={[styles.infoValue, { color: paperTheme.colors.onSurface }]}>
-                  {user.company}
-                </Text>
-              </View>
-            )}
-
-            {user.job_title && (
-              <View style={styles.infoRow}>
-                <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
-                  المسمى الوظيفي:
-                </Text>
-                <Text style={[styles.infoValue, { color: paperTheme.colors.onSurface }]}>
-                  {user.job_title}
-                </Text>
-              </View>
-            )}
-
-            {user.bio && (
-              <View style={styles.infoRow}>
-                <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
-                  النبذة الشخصية:
-                </Text>
-                <Text style={[styles.infoValue, { color: paperTheme.colors.onSurface }]}>
-                  {user.bio}
-                </Text>
-              </View>
-            )}
-          </Card.Content>
-        </Card>
-      )}
-
-      {/* Theme Preview Card - مُصحح */}
+      {/* Theme Preview */}
       <Card style={[styles.infoCard, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
         <Card.Content>
           <Title style={[styles.sectionTitle, { color: paperTheme.colors.onSurface }]}>
-            معاينة الألوان
+            معاينة الثيم الشخصي
           </Title>
-          
+
           <View style={styles.colorPreviewContainer}>
             <View style={styles.colorPreview}>
               <Text style={[styles.colorLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
-                لون الخلفية
+                الخلفية
               </Text>
-              <View
-                style={[
-                  styles.colorSample,
-                  { backgroundColor: user.background_color || paperTheme.colors.primary }
-                ]}
-              />
+              <View style={[
+                styles.colorSample,
+                { backgroundColor: user.background_color },
+                shadows.small,
+              ]} />
             </View>
 
             <View style={styles.colorPreview}>
               <Text style={[styles.colorLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
-                لون النص
+                النص
               </Text>
-              <View
-                style={[
-                  styles.colorSample,
-                  { backgroundColor: user.text_color || paperTheme.colors.onSurface }
-                ]}
-              />
+              <View style={[
+                styles.colorSample,
+                { backgroundColor: user.text_color },
+                shadows.small,
+              ]} />
             </View>
 
             <View style={styles.colorPreview}>
               <Text style={[styles.colorLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
-                لون الأزرار
+                الأزرار
               </Text>
-              <View
-                style={[
-                  styles.colorSample,
-                  { backgroundColor: user.button_color || paperTheme.colors.secondary }
-                ]}
-              />
+              <View style={[
+                styles.colorSample,
+                { backgroundColor: user.button_color },
+                shadows.small,
+              ]} />
             </View>
           </View>
+
+          {user.bio && (
+            <>
+              <Divider style={{ marginVertical: 16, backgroundColor: paperTheme.colors.outline }} />
+              <Text style={[styles.infoLabel, { color: paperTheme.colors.onSurface }]}>
+                النبذة الشخصية:
+              </Text>
+              <Text style={[
+                styles.infoValue, 
+                { 
+                  color: paperTheme.colors.onSurfaceVariant,
+                  marginTop: 8,
+                  lineHeight: 20,
+                  textAlign: I18nManager.isRTL ? 'right' : 'left',
+                }
+              ]}>
+                {user.bio}
+              </Text>
+            </>
+          )}
         </Card.Content>
       </Card>
     </ScrollView>
@@ -417,7 +415,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 32,
   },
   profileCard: {
     marginBottom: 16,
@@ -492,9 +489,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   infoRow: {
-    flexDirection: 'row',
+    flexDirection: I18nManager.isRTL ? 'row-reverse' : 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingVertical: 8,
@@ -505,11 +503,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     flex: 1,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   infoValue: {
     fontSize: 14,
     flex: 2,
-    textAlign: 'right',
+    textAlign: I18nManager.isRTL ? 'left' : 'right',
   },
   colorPreviewContainer: {
     flexDirection: 'row',
@@ -522,6 +521,7 @@ const styles = StyleSheet.create({
   colorLabel: {
     fontSize: 12,
     marginBottom: 8,
+    textAlign: 'center',
   },
   colorSample: {
     width: 40,

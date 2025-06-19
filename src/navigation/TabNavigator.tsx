@@ -1,8 +1,8 @@
-// src/navigation/TabNavigator.tsx - مُصحح
+// src/navigation/TabNavigator.tsx - مُصحح تماماً
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Appbar, useTheme } from 'react-native-paper';
+import { Appbar, useTheme, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -102,7 +102,8 @@ const TabNavigator: React.FC = () => {
               />
             );
           },
-          tabBarLabel: ({ focused }) => {
+          // إصلاح المشكلة: استخدام tabBarLabel كـ component بدلاً من string
+          tabBarLabel: ({ focused, color }) => {
             let label: string;
             
             switch (route.name) {
@@ -122,7 +123,19 @@ const TabNavigator: React.FC = () => {
                 label = '';
             }
 
-            return label;
+            return (
+              <Text 
+                style={{ 
+                  color,
+                  fontSize: 12,
+                  fontWeight: focused ? '600' : '400',
+                  textAlign: 'center'
+                }}
+                numberOfLines={1}
+              >
+                {label}
+              </Text>
+            );
           },
           tabBarActiveTintColor: paperTheme.colors.primary,
           tabBarInactiveTintColor: paperTheme.colors.onSurfaceVariant,
@@ -132,11 +145,6 @@ const TabNavigator: React.FC = () => {
             borderTopWidth: 1,
             paddingBottom: insets.bottom,
             height: 60 + insets.bottom,
-          },
-          tabBarLabelStyle: {
-            fontSize: 12,
-            fontWeight: '600',
-            marginBottom: 4,
           },
           tabBarItemStyle: {
             paddingTop: 8,

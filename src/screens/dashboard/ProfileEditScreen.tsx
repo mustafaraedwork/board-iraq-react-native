@@ -1,69 +1,61 @@
-// src/screens/dashboard/ProfileEditScreen.tsx - مُصحح تماماً
+// src/screens/dashboard/ProfileEditScreen.tsx - مع ميزة رفع الصور المتكاملة
 import React, { useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
   StyleSheet,
   Alert,
-  Modal,
-  Dimensions,
+  I18nManager,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import {
   Card,
   Title,
   Button,
   TextInput,
-  Text,
-  Surface,
   useTheme,
+  Text,
+  Modal,
+  Portal,
 } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { supabase } from '../../services/supabase';
-import { User } from '../../types';
+import type { User } from '../../types';
 import { useAppTheme, useShadows } from '../../contexts/ThemeContext';
+import ProfileImagePicker from '../../components/ProfileImagePicker';
 
-const { width: screenWidth } = Dimensions.get('window');
-
-// تخطيط التحقق من صحة البيانات
+// Form validation schema
 const profileSchema = z.object({
-  full_name: z.string().min(2, 'الاسم يجب أن يكون على الأقل حرفين'),
+  full_name: z.string().min(1, 'الاسم الكامل مطلوب'),
   email: z.string().email('البريد الإلكتروني غير صحيح').optional().or(z.literal('')),
   phone: z.string().optional(),
   job_title: z.string().optional(),
   company: z.string().optional(),
-  bio: z.string().max(500, 'النبذة الشخصية يجب أن تكون أقل من 500 حرف').optional(),
+  bio: z.string().optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
-// ألوان محددة مسبقاً
+const { width: screenWidth } = Dimensions.get('window');
+
+// Preset colors for theming
 const PRESET_COLORS = [
-  '#2196F3', // Blue
-  '#4CAF50', // Green
-  '#FF9800', // Orange
-  '#9C27B0', // Purple
-  '#F44336', // Red
-  '#607D8B', // Blue Grey
-  '#795548', // Brown
-  '#E91E63', // Pink
-  '#009688', // Teal
-  '#3F51B5', // Indigo
-  '#8BC34A', // Light Green
-  '#FFC107', // Amber
-  '#673AB7', // Deep Purple
-  '#00BCD4', // Cyan
-  '#CDDC39', // Lime
-  '#FF5722', // Deep Orange
+  '#1976D2', '#2196F3', '#03A9F4', '#00BCD4', '#009688', '#4CAF50',
+  '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107', '#FF9800', '#FF5722',
+  '#F44336', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3',
+  '#607D8B', '#795548', '#9E9E9E', '#424242', '#212121', '#000000',
 ];
 
 const ProfileEditScreen: React.FC = () => {
   const paperTheme = useTheme();
   const { isDark } = useAppTheme();
   const shadows = useShadows();
+  
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -73,10 +65,18 @@ const ProfileEditScreen: React.FC = () => {
   const {
     control,
     handleSubmit,
-    reset,
+    setValue,
     formState: { errors },
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
+    defaultValues: {
+      full_name: '',
+      email: '',
+      phone: '',
+      job_title: '',
+      company: '',
+      bio: '',
+    },
   });
 
   useEffect(() => {
@@ -87,21 +87,20 @@ const ProfileEditScreen: React.FC = () => {
     try {
       const userData = await AsyncStorage.getItem('user');
       if (userData) {
-        const parsedUser: User = JSON.parse(userData);
+        const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
         
-        // تعبئة النموذج بالبيانات الحالية
-        reset({
-          full_name: parsedUser.full_name || '',
-          email: parsedUser.email || '',
-          phone: parsedUser.phone || '',
-          job_title: parsedUser.job_title || '',
-          company: parsedUser.company || '',
-          bio: parsedUser.bio || '',
-        });
+        // تعبئة النموذج
+        setValue('full_name', parsedUser.full_name || '');
+        setValue('email', parsedUser.email || '');
+        setValue('phone', parsedUser.phone || '');
+        setValue('job_title', parsedUser.job_title || '');
+        setValue('company', parsedUser.company || '');
+        setValue('bio', parsedUser.bio || '');
       }
     } catch (error) {
       console.error('Error loading user data:', error);
+      Alert.alert('خطأ', 'حدث خطأ في تحميل البيانات');
     } finally {
       setLoading(false);
     }
@@ -115,7 +114,7 @@ const ProfileEditScreen: React.FC = () => {
       const { error } = await supabase
         .from('users')
         .update({
-          full_name: data.full_name,
+          full_name: data.full_name || null,
           email: data.email || null,
           phone: data.phone || null,
           job_title: data.job_title || null,
@@ -141,6 +140,34 @@ const ProfileEditScreen: React.FC = () => {
       Alert.alert('خطأ', 'حدث خطأ أثناء حفظ البيانات');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // تحديث الصورة الشخصية
+  const handleImageUpdate = async (newImageUrl: string | null) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          profile_image_url: newImageUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error updating profile image:', error);
+        Alert.alert('خطأ', 'حدث خطأ أثناء تحديث الصورة');
+      } else {
+        // تحديث البيانات المحلية
+        const updatedUser = { ...user, profile_image_url: newImageUrl || undefined };
+        setUser(updatedUser);
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+    } catch (error) {
+      console.error('Error updating profile image:', error);
+      Alert.alert('خطأ', 'حدث خطأ أثناء تحديث الصورة');
     }
   };
 
@@ -210,6 +237,28 @@ const ProfileEditScreen: React.FC = () => {
         style={[styles.container, { backgroundColor: paperTheme.colors.background }]}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Profile Image Card */}
+        <Card style={[styles.card, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
+          <Card.Content>
+            <Title style={[styles.sectionTitle, { color: paperTheme.colors.onSurface }]}>
+              الصورة الشخصية
+            </Title>
+            
+            <View style={styles.imageSection}>
+              <ProfileImagePicker
+                imageUrl={user.profile_image_url}
+                userId={user.id}
+                onImageUpdate={handleImageUpdate}
+                size={120}
+                showEditButton={true}
+              />
+              <Text style={[styles.imageHint, { color: paperTheme.colors.onSurface }]}>
+                اضغط على الصورة لتغييرها أو حذفها
+              </Text>
+            </View>
+          </Card.Content>
+        </Card>
+
         {/* Personal Information Card */}
         <Card style={[styles.card, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
           <Card.Content>
@@ -298,16 +347,7 @@ const ProfileEditScreen: React.FC = () => {
                 />
               )}
             />
-          </Card.Content>
-        </Card>
 
-        {/* Professional Information Card */}
-        <Card style={[styles.card, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
-          <Card.Content>
-            <Title style={[styles.sectionTitle, { color: paperTheme.colors.onSurface }]}>
-              المعلومات المهنية
-            </Title>
-            
             <Controller
               control={control}
               name="job_title"
@@ -363,8 +403,7 @@ const ProfileEditScreen: React.FC = () => {
                   mode="outlined"
                   style={styles.input}
                   multiline
-                  numberOfLines={4}
-                  placeholder="اكتب نبذة مختصرة عن نفسك..."
+                  numberOfLines={3}
                   right={<TextInput.Icon icon="text" />}
                   theme={{
                     colors: {
@@ -376,91 +415,84 @@ const ProfileEditScreen: React.FC = () => {
                 />
               )}
             />
-            {errors.bio && (
-              <Text style={[styles.errorText, { color: paperTheme.colors.error }]}>
-                {errors.bio.message}
-              </Text>
-            )}
           </Card.Content>
         </Card>
 
-        {/* Color Customization Card */}
+        {/* Theme Customization Card */}
         <Card style={[styles.card, shadows.medium, { backgroundColor: paperTheme.colors.surface }]}>
           <Card.Content>
             <Title style={[styles.sectionTitle, { color: paperTheme.colors.onSurface }]}>
               تخصيص الألوان
             </Title>
             
+            {/* Background Color */}
             <View style={styles.colorSection}>
-              <Text style={[styles.colorLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
+              <Text style={[styles.colorLabel, { color: paperTheme.colors.onSurface }]}>
                 لون الخلفية
               </Text>
-              <Surface
-                style={[
+              <TouchableOpacity onPress={() => openColorPicker('background')}>
+                <View style={[
                   styles.colorPreview,
-                  { backgroundColor: user.background_color || paperTheme.colors.primary },
+                  { backgroundColor: user.background_color },
                   shadows.small,
-                ]}
-              >
-                <Button
-                  mode="contained"
-                  onPress={() => openColorPicker('background')}
-                  buttonColor={user.background_color || paperTheme.colors.primary}
-                  textColor="#ffffff"
-                  style={styles.colorButton}
-                  compact
-                >
-                  اختيار اللون
-                </Button>
-              </Surface>
+                ]}>
+                  <Text style={[
+                    styles.colorButton,
+                    { color: user.text_color }
+                  ]}>
+                    عينة النص
+                  </Text>
+                </View>
+              </TouchableOpacity>
             </View>
 
+            {/* Text Color */}
             <View style={styles.colorSection}>
-              <Text style={[styles.colorLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
+              <Text style={[styles.colorLabel, { color: paperTheme.colors.onSurface }]}>
                 لون النص
               </Text>
-              <Surface
-                style={[
+              <TouchableOpacity onPress={() => openColorPicker('text')}>
+                <View style={[
                   styles.colorPreview,
-                  { backgroundColor: user.text_color || '#333333' },
+                  { backgroundColor: user.background_color },
                   shadows.small,
-                ]}
-              >
-                <Button
-                  mode="contained"
-                  onPress={() => openColorPicker('text')}
-                  buttonColor={user.text_color || '#333333'}
-                  textColor="#ffffff"
-                  style={styles.colorButton}
-                  compact
-                >
-                  اختيار اللون
-                </Button>
-              </Surface>
+                ]}>
+                  <Text style={[
+                    styles.colorButton,
+                    { color: user.text_color }
+                  ]}>
+                    عينة النص
+                  </Text>
+                </View>
+              </TouchableOpacity>
             </View>
 
+            {/* Button Color */}
             <View style={styles.colorSection}>
-              <Text style={[styles.colorLabel, { color: paperTheme.colors.onSurfaceVariant }]}>
+              <Text style={[styles.colorLabel, { color: paperTheme.colors.onSurface }]}>
                 لون الأزرار
               </Text>
-              <Surface
-                style={[
+              <TouchableOpacity onPress={() => openColorPicker('button')}>
+                <View style={[
                   styles.colorPreview,
-                  { backgroundColor: user.button_color || paperTheme.colors.secondary },
+                  { backgroundColor: user.background_color },
                   shadows.small,
-                ]}
-              >
-                <Button
-                  mode="contained"
-                  onPress={() => openColorPicker('button')}
-                  buttonColor={user.button_color || paperTheme.colors.secondary}
-                  textColor="#ffffff"
-                  style={styles.colorButton}
-                  compact
-                >
-                  اختيار اللون
-                </Button>
-              </Surface>
+                ]}>
+                  <View style={[
+                    styles.colorButton,
+                    { 
+                      backgroundColor: user.button_color,
+                      borderRadius: 8,
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                    }
+                  ]}>
+                    <Text style={{ color: '#FFFFFF' }}>
+                      عينة الزر
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
             </View>
           </Card.Content>
         </Card>
@@ -472,53 +504,54 @@ const ProfileEditScreen: React.FC = () => {
           loading={saving}
           disabled={saving}
           style={[styles.saveButton, shadows.medium]}
-          icon="content-save"
           buttonColor={paperTheme.colors.primary}
+          textColor={paperTheme.colors.onPrimary}
         >
           {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
         </Button>
       </ScrollView>
 
-      {/* Color Picker Modal - مُصحح */}
-      <Modal
-        visible={colorModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setColorModalVisible(false)}
-      >
-        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-          <View style={[styles.modalContent, { backgroundColor: paperTheme.colors.surface }, shadows.large]}>
-            <Title style={[styles.modalTitle, { color: paperTheme.colors.onSurface }]}>
-              اختيار لون {getColorTypeName(selectedColorType)}
-            </Title>
-            
-            <View style={styles.colorGrid}>
-              {PRESET_COLORS.map((color) => (
-                <TouchableOpacity
-                  key={color}
-                  onPress={() => updateColor(selectedColorType, color)}
-                  style={[
-                    styles.colorOption,
-                    { backgroundColor: color },
-                    shadows.small,
-                  ]}
-                />
-              ))}
-            </View>
-
-            <View style={styles.modalActions}>
-              <Button
-                mode="outlined"
-                onPress={() => setColorModalVisible(false)}
-                style={styles.modalButton}
-                textColor={paperTheme.colors.onSurface}
-              >
-                إلغاء
-              </Button>
-            </View>
+      {/* Color Picker Modal */}
+      <Portal>
+        <Modal
+          visible={colorModalVisible}
+          onDismiss={() => setColorModalVisible(false)}
+          contentContainerStyle={[
+            styles.modalContent,
+            { backgroundColor: paperTheme.colors.surface },
+            shadows.large,
+          ]}
+        >
+          <Title style={[styles.modalTitle, { color: paperTheme.colors.onSurface }]}>
+            اختيار لون {getColorTypeName(selectedColorType)}
+          </Title>
+          
+          <View style={styles.colorGrid}>
+            {PRESET_COLORS.map((color) => (
+              <TouchableOpacity
+                key={color}
+                onPress={() => updateColor(selectedColorType, color)}
+                style={[
+                  styles.colorOption,
+                  { backgroundColor: color },
+                  shadows.small,
+                ]}
+              />
+            ))}
           </View>
-        </View>
-      </Modal>
+
+          <View style={styles.modalActions}>
+            <Button
+              mode="outlined"
+              onPress={() => setColorModalVisible(false)}
+              style={styles.modalButton}
+              textColor={paperTheme.colors.onSurface}
+            >
+              إلغاء
+            </Button>
+          </View>
+        </Modal>
+      </Portal>
     </>
   );
 };
@@ -543,6 +576,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
+  },
+  imageSection: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  imageHint: {
+    fontSize: 12,
+    marginTop: 12,
+    textAlign: 'center',
+    opacity: 0.7,
   },
   input: {
     marginBottom: 12,
@@ -553,6 +597,7 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 8,
     marginLeft: 12,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   colorSection: {
     marginBottom: 16,
@@ -561,6 +606,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   colorPreview: {
     borderRadius: 12,
@@ -575,17 +621,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 4,
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   modalContent: {
-    width: screenWidth * 0.9,
-    maxWidth: 400,
+    margin: 20,
     borderRadius: 20,
     padding: 24,
-    margin: 20,
   },
   modalTitle: {
     fontSize: 18,

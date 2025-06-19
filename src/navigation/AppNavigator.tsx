@@ -1,4 +1,4 @@
-// src/navigation/AppNavigator.tsx - مُصحح
+// src/navigation/AppNavigator.tsx - مُصحح تماماً
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -18,7 +18,6 @@ export type RootStackParamList = {
 // Wrapper component for LoginScreen to handle navigation prop correctly
 const LoginScreenWrapper: React.FC = () => {
   const handleLoginSuccess = () => {
-    // This will be handled by the auth state change detection
     console.log('Login successful');
   };
 

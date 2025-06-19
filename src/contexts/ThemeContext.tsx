@@ -1,7 +1,9 @@
-// src/contexts/ThemeContext.tsx - سياق إدارة الثيمات
+// src/contexts/ThemeContext.tsx - سياق إدارة الثيمات مُصحح تماماً
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
+import { Text, ActivityIndicator } from 'react-native-paper';
 import { lightTheme, darkTheme } from '../styles/themes';
 
 type ThemeMode = 'light' | 'dark';
@@ -67,8 +69,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     isDark,
   };
 
+  // عرض مكون تحميل بدلاً من null
   if (isLoading) {
-    return null; // أو مكون تحميل إذا كنت تريد
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 10 }}>جاري التحميل...</Text>
+      </View>
+    );
   }
 
   return (
